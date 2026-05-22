@@ -188,6 +188,7 @@ const CounterInput = ({ label, value, onChange, min = 0, max = 1000, image, unit
 // Print-only estimate component
 const PrintEstimate = ({ result, formData }: { result: CalculationResult; formData: FormData }) => {
   const date = new Date().toLocaleDateString('ru-RU');
+  const shieldTotal = result.panelModules.cost + result.panelInstallation.cost;
   
   return (
     <div className="print-only hidden print:block p-8 max-w-4xl mx-auto">
@@ -233,11 +234,6 @@ const PrintEstimate = ({ result, formData }: { result: CalculationResult; formDa
             <span className="text-neutral-600">Тип прокладки:</span>
             <span className="font-medium">{formData.wiringType === 'hidden' ? 'Скрытая' : 'Открытая'}</span>
           </div>
-        </div>
-        <div className="mt-4 space-y-1 text-sm text-neutral-600">
-          <p>Линии на щит: {result.panelLines.count} шт.</p>
-          <p>Средняя длина линии: {AVERAGE_PANEL_LINE_LENGTH_METERS} м</p>
-          <p>Дополнительный кабель по линиям: {result.panelLines.count} × {AVERAGE_PANEL_LINE_LENGTH_METERS} м = {result.panelLines.cableMeters} м</p>
         </div>
       </div>
       
@@ -287,20 +283,13 @@ const PrintEstimate = ({ result, formData }: { result: CalculationResult; formDa
             </tr>
             <tr className="border-b border-neutral-200">
               <td className="py-2 text-neutral-600">5</td>
-              <td className="py-2">Модули электрощита (сборка)</td>
+              <td className="py-2">Сборка и монтаж щита</td>
               <td className="py-2 text-neutral-500 font-mono text-xs">{result.panelModules.formula}</td>
-              <td className="py-2 text-center">{result.panelModules.count} мод</td>
-              <td className="py-2 text-right font-medium">{formatCurrency(result.panelModules.cost)}</td>
+              <td className="py-2 text-center">{result.panelModules.count} мод / {result.panelInstallation.slots} мест</td>
+              <td className="py-2 text-right font-medium">{formatCurrency(shieldTotal)}</td>
             </tr>
             <tr className="border-b border-neutral-200">
               <td className="py-2 text-neutral-600">6</td>
-              <td className="py-2">Монтаж электрощита ({result.panelInstallation.slots} мест)</td>
-              <td className="py-2 text-neutral-500 font-mono text-xs">—</td>
-              <td className="py-2 text-center">—</td>
-              <td className="py-2 text-right font-medium">{formatCurrency(result.panelInstallation.cost)}</td>
-            </tr>
-            <tr className="border-b border-neutral-200">
-              <td className="py-2 text-neutral-600">7</td>
               <td className="py-2">Слаботочка (интернет/TV/сигнализация)</td>
               <td className="py-2 text-neutral-500 font-mono text-xs">{result.lowVoltage.formula}</td>
               <td className="py-2 text-center">{result.lowVoltage.count} точек</td>
@@ -372,6 +361,8 @@ function App() {
   }, []);
 
   if (!result) return null;
+
+  const shieldTotal = result.panelModules.cost + result.panelInstallation.cost;
 
   return (
     <>
@@ -641,12 +632,8 @@ function App() {
                         <span className="font-medium text-neutral-900">{formatCurrency(result.cable.cost)} ₽</span>
                       </div>
                       <div className="flex justify-between items-center py-2 border-b border-neutral-200">
-                        <span className="text-sm text-neutral-600">Модули щита</span>
-                        <span className="font-medium text-neutral-900">{formatCurrency(result.panelModules.cost)} ₽</span>
-                      </div>
-                      <div className="flex justify-between items-center py-2 border-b border-neutral-200">
-                        <span className="text-sm text-neutral-600">Монтаж щита</span>
-                        <span className="font-medium text-neutral-900">{formatCurrency(result.panelInstallation.cost)} ₽</span>
+                        <span className="text-sm text-neutral-600">Сборка и монтаж щита</span>
+                        <span className="font-medium text-neutral-900">{formatCurrency(shieldTotal)} ₽</span>
                       </div>
                       <div className="flex justify-between items-center py-2 border-b border-neutral-200">
                         <span className="text-sm text-neutral-600">Слаботочка</span>
