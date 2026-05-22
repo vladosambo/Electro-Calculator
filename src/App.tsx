@@ -57,6 +57,10 @@ const CABLE_INSTALL_PRICE_PER_METER = 150;
 const CHASE_PRICE_PER_METER = 300;
 const SWITCHES_PER_JUNCTION_BOX = 2;
 const PANEL_LINES_PER_BOX_REDUCTION = 3;
+const MIN_AREA_FOR_LINE_SCALE = 30;
+const MAX_AREA_FOR_LINE_SCALE = 100;
+const MIN_CABLE_METERS_PER_LINE = 5;
+const MAX_CABLE_METERS_PER_LINE_AT_100M2 = 15;
 
 const assetPath = (file: string) => `${import.meta.env.BASE_URL}images/${file}`;
 
@@ -99,10 +103,19 @@ const calculateEstimate = (data: FormData): CalculationResult => {
   const junctionBoxFormula = `max(0, ⌈${sockets}/5⌉ + ⌈${switches}/${SWITCHES_PER_JUNCTION_BOX}⌉ - ⌊${panelLines}/${PANEL_LINES_PER_BOX_REDUCTION}⌋) = ${junctionBoxCount} шт × ${PRICES.junctionBox} ₽`;
 
   // 4. Cable (кабель)
-  const cableLength = area * COEFFS.cablePerArea + lightPoints * COEFFS.cablePerLightPoint;
+  const cableMetersPerPanelLine =
+    area <= MIN_AREA_FOR_LINE_SCALE
+      ? MIN_CABLE_METERS_PER_LINE
+      : MIN_CABLE_METERS_PER_LINE +
+        ((area - MIN_AREA_FOR_LINE_SCALE) /
+          (MAX_AREA_FOR_LINE_SCALE - MIN_AREA_FOR_LINE_SCALE)) *
+          (MAX_CABLE_METERS_PER_LINE_AT_100M2 - MIN_CABLE_METERS_PER_LINE);
+  const normalizedCableMetersPerPanelLine = Math.max(MIN_CABLE_METERS_PER_LINE, cableMetersPerPanelLine);
+  const panelLineCableMeters = panelLines * Math.ceil(normalizedCableMetersPerPanelLine);
+  const cableLength = area * COEFFS.cablePerArea + lightPoints * COEFFS.cablePerLightPoint + panelLineCableMeters;
   const cableMultiplier = wiringType === 'open' ? 0.8 : 1;
   const cableCost = cableLength * cableMultiplier * CABLE_INSTALL_PRICE_PER_METER;
-  const cableFormula = `(${area}×${COEFFS.cablePerArea} + ${lightPoints}×${COEFFS.cablePerLightPoint}) = ${cableLength.toFixed(0)} м${wiringType === 'open' ? ' × 0.8' : ''} × ${CABLE_INSTALL_PRICE_PER_METER} ₽`;
+  const cableFormula = `(${area}×${COEFFS.cablePerArea} + ${lightPoints}×${COEFFS.cablePerLightPoint} + ${panelLines}×${Math.ceil(normalizedCableMetersPerPanelLine)}) = ${cableLength.toFixed(0)} м${wiringType === 'open' ? ' × 0.8' : ''} × ${CABLE_INSTALL_PRICE_PER_METER} ₽`;
 
   // 5. Panel modules (модули щита)
   const moduleCount = 3 + panelLines;
