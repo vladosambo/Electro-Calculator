@@ -185,6 +185,97 @@ const CounterInput = ({ label, value, onChange, min = 0, max = 1000, image, unit
   );
 };
 
+interface AreaInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  onCommit: (value: number) => void;
+  image: string;
+}
+
+const AreaInput = ({ value, onChange, onCommit, image }: AreaInputProps) => {
+  const commitValue = () => {
+    const parsed = parseInt(value, 10);
+
+    if (!value.trim() || Number.isNaN(parsed)) {
+      onChange('0');
+      onCommit(0);
+      return;
+    }
+
+    if (parsed === 0) {
+      onChange('0');
+      onCommit(0);
+      return;
+    }
+
+    if (parsed < 20) {
+      onChange('20');
+      onCommit(20);
+      return;
+    }
+
+    onChange(String(parsed));
+    onCommit(parsed);
+  };
+
+  const increase = () => {
+    const parsed = parseInt(value, 10) || 0;
+    const next = parsed <= 0 ? 20 : parsed + 1;
+    onChange(String(next));
+    onCommit(next);
+  };
+
+  const decrease = () => {
+    const parsed = parseInt(value, 10) || 0;
+    const next = Math.max(0, parsed - 1);
+    onChange(String(next));
+    onCommit(next);
+  };
+
+  return (
+    <div className="space-y-3">
+      <Label className="flex items-center gap-3 text-sm font-medium text-neutral-700">
+        <img src={image} alt="" className="w-7 h-7 object-contain opacity-100 contrast-125 saturate-125 shrink-0" />
+        Площадь помещения
+      </Label>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={decrease}
+          className="w-10 h-10 rounded-lg border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 flex items-center justify-center transition-all duration-200 active:scale-95"
+          type="button"
+        >
+          <span className="text-lg text-neutral-500">−</span>
+        </button>
+        <div className="flex-1 relative">
+          <Input
+            type="number"
+            value={value}
+            placeholder="Например: 100"
+            onFocus={(e) => {
+              if (value === '0') {
+                onChange('');
+                return;
+              }
+              e.currentTarget.select();
+            }}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={commitValue}
+            className="text-center font-medium text-base h-10 rounded-lg border-neutral-200 focus:border-neutral-400 focus:ring-0"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400">м²</span>
+        </div>
+        <button
+          onClick={increase}
+          className="w-10 h-10 rounded-lg border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 flex items-center justify-center transition-all duration-200 active:scale-95"
+          type="button"
+        >
+          <span className="text-lg text-neutral-500">+</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // Print-only estimate component
 const PrintEstimate = ({ result, formData }: { result: CalculationResult; formData: FormData }) => {
   const date = new Date().toLocaleDateString('ru-RU');
@@ -318,7 +409,7 @@ const PrintEstimate = ({ result, formData }: { result: CalculationResult; formDa
 
 function App() {
   const [formData, setFormData] = useState<FormData>({
-    area: 70,
+    area: 0,
     sockets: 30,
     switches: 17,
     lightPoints: 15,
@@ -329,6 +420,7 @@ function App() {
   
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [areaInputValue, setAreaInputValue] = useState('0');
 
   // Calculate on form change
   useEffect(() => {
@@ -336,10 +428,14 @@ function App() {
     setResult(newResult);
   }, [formData]);
 
+  useEffect(() => {
+    setAreaInputValue(formData.area === 0 ? '0' : String(formData.area));
+  }, [formData.area]);
+
   // Handle reset
   const handleReset = () => {
     setFormData({
-      area: 70,
+      area: 0,
       sockets: 30,
       switches: 17,
       lightPoints: 15,
@@ -347,6 +443,7 @@ function App() {
       panelLines: 10,
       wiringType: 'hidden',
     });
+    setAreaInputValue('0');
     setShowDetails(false);
   };
 
@@ -358,6 +455,11 @@ function App() {
   // Update form field
   const updateField = useCallback(<K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const commitArea = useCallback((value: number) => {
+    setFormData(prev => ({ ...prev, area: value }));
+    setAreaInputValue(value === 0 ? '0' : String(value));
   }, []);
 
   if (!result) return null;
@@ -400,15 +502,12 @@ function App() {
                   Параметры помещения
                 </h2>
                 <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-100">
-                      <CounterInput
-                        label="Площадь помещения"
-                        value={formData.area}
-                        onChange={(v) => updateField('area', v)}
-                        min={20}
-                        max={500}
-                        image={assetPath('home-v2.png')}
-                        unit="м²"
-                      />
+                    <AreaInput
+                      value={areaInputValue}
+                      onChange={setAreaInputValue}
+                      onCommit={commitArea}
+                      image={assetPath('home-v2.png')}
+                    />
                 </div>
               </section>
 
