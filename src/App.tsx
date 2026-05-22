@@ -20,7 +20,7 @@ interface CalculationResult {
   cable: { count: number; cost: number; formula: string; length: number };
   panelModules: { count: number; cost: number; formula: string };
   panelInstallation: { cost: number; slots: number };
-  panelLines: { count: number; cableMeters: number; cost: number; formula: string };
+  panelLines: { count: number; cableMeters: number };
   lowVoltage: { count: number; cost: number; formula: string };
   total: number;
 }
@@ -56,8 +56,9 @@ const COEFFS = {
   moduleToSlotRatio: 1.5,
 };
 
-const PANEL_LINE_PRICE = 1200;
 const AVERAGE_PANEL_LINE_LENGTH_METERS = 8;
+
+const assetPath = (file: string) => `${import.meta.env.BASE_URL}images/${file}`;
 
 // Format currency with spaces as thousand separators
 const formatCurrency = (amount: number): string => {
@@ -96,8 +97,10 @@ const calculateEstimate = (data: FormData): CalculationResult => {
   // 4. Cable (кабель)
   const cableLength = area * COEFFS.cablePerArea + lightPoints * COEFFS.cablePerLightPoint;
   const cableMultiplier = wiringType === 'open' ? 0.8 : 1;
-  const cableCost = cableLength * cableMultiplier * PRICES.cable;
-  const cableFormula = `(${area}×${COEFFS.cablePerArea} + ${lightPoints}×${COEFFS.cablePerLightPoint}) = ${cableLength.toFixed(0)} м${wiringType === 'open' ? ' × 0.8' : ''} × ${PRICES.cable} ₽`;
+  const panelCableMeters = panelLines * AVERAGE_PANEL_LINE_LENGTH_METERS;
+  const totalCableLength = cableLength + panelCableMeters;
+  const cableCost = totalCableLength * cableMultiplier * PRICES.cable;
+  const cableFormula = `(${area}×${COEFFS.cablePerArea} + ${lightPoints}×${COEFFS.cablePerLightPoint} + ${panelLines}×${AVERAGE_PANEL_LINE_LENGTH_METERS}) = ${totalCableLength.toFixed(0)} м${wiringType === 'open' ? ' × 0.8' : ''} × ${PRICES.cable} ₽`;
   
   // 5. Panel modules (модули щита)
   const moduleCount = Math.max(COEFFS.minModules, Math.ceil(panelLines / COEFFS.modulesPerPoint));
@@ -108,17 +111,12 @@ const calculateEstimate = (data: FormData): CalculationResult => {
   const slots = Math.ceil(moduleCount * COEFFS.moduleToSlotRatio);
   const panelInstallationCost = calculatePanelInstallation(slots);
   
-  // 7. Panel lines (lines to the panel)
-  const panelCableMeters = panelLines * AVERAGE_PANEL_LINE_LENGTH_METERS;
-  const panelLinesCost = panelLines * PANEL_LINE_PRICE;
-  const panelLinesFormula = `${panelLines} × ${PANEL_LINE_PRICE} ₽`;
-  
-  // 8. Low voltage (слаботочка)
+  // 7. Low voltage (слаботочка)
   const lowVoltageCost = lowVoltagePoints * PRICES.wifiPoint;
   const lowVoltageFormula = `${lowVoltagePoints} × ${PRICES.wifiPoint} ₽`;
   
   // Total
-  const total = socketBoxCost + grooveCost + junctionBoxCost + cableCost + moduleCost + panelInstallationCost + panelLinesCost + lowVoltageCost;
+  const total = socketBoxCost + grooveCost + junctionBoxCost + cableCost + moduleCost + panelInstallationCost + lowVoltageCost;
   
   return {
     socketBoxes: { count: socketBoxCount, cost: socketBoxCost, formula: socketBoxFormula },
@@ -127,7 +125,7 @@ const calculateEstimate = (data: FormData): CalculationResult => {
     cable: { count: Math.ceil(cableLength), cost: cableCost, formula: cableFormula, length: cableLength },
     panelModules: { count: moduleCount, cost: moduleCost, formula: moduleFormula },
     panelInstallation: { cost: panelInstallationCost, slots },
-    panelLines: { count: panelLines, cableMeters: panelCableMeters, cost: panelLinesCost, formula: panelLinesFormula },
+    panelLines: { count: panelLines, cableMeters: panelCableMeters },
     lowVoltage: { count: lowVoltagePoints, cost: lowVoltageCost, formula: lowVoltageFormula },
     total,
   };
@@ -236,6 +234,11 @@ const PrintEstimate = ({ result, formData }: { result: CalculationResult; formDa
             <span className="font-medium">{formData.wiringType === 'hidden' ? 'Скрытая' : 'Открытая'}</span>
           </div>
         </div>
+        <div className="mt-4 space-y-1 text-sm text-neutral-600">
+          <p>Линии на щит: {result.panelLines.count} шт.</p>
+          <p>Средняя длина линии: {AVERAGE_PANEL_LINE_LENGTH_METERS} м</p>
+          <p>Дополнительный кабель по линиям: {result.panelLines.count} × {AVERAGE_PANEL_LINE_LENGTH_METERS} м = {result.panelLines.cableMeters} м</p>
+        </div>
       </div>
       
       {/* Estimate Table */}
@@ -277,7 +280,7 @@ const PrintEstimate = ({ result, formData }: { result: CalculationResult; formDa
             </tr>
             <tr className="border-b border-neutral-200">
               <td className="py-2 text-neutral-600">4</td>
-              <td className="py-2">Кабель ВВГнг (прокладка)</td>
+              <td className="py-2">Монтаж кабеля</td>
               <td className="py-2 text-neutral-500 font-mono text-xs">{result.cable.formula}</td>
               <td className="py-2 text-center">{Math.round(result.cable.length)} м</td>
               <td className="py-2 text-right font-medium">{formatCurrency(result.cable.cost)}</td>
@@ -295,13 +298,6 @@ const PrintEstimate = ({ result, formData }: { result: CalculationResult; formDa
               <td className="py-2 text-neutral-500 font-mono text-xs">—</td>
               <td className="py-2 text-center">—</td>
               <td className="py-2 text-right font-medium">{formatCurrency(result.panelInstallation.cost)}</td>
-            </tr>
-            <tr className="border-b border-neutral-200">
-              <td className="py-2 text-neutral-600">6.1</td>
-              <td className="py-2">Линии на щит</td>
-              <td className="py-2 text-neutral-500 font-mono text-xs">{result.panelLines.formula}</td>
-              <td className="py-2 text-center">{result.panelLines.count} шт.</td>
-              <td className="py-2 text-right font-medium">{formatCurrency(result.panelLines.cost)}</td>
             </tr>
             <tr className="border-b border-neutral-200">
               <td className="py-2 text-neutral-600">7</td>
@@ -413,15 +409,15 @@ function App() {
                   Параметры помещения
                 </h2>
                 <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-100">
-                  <CounterInput
-                    label="Площадь помещения"
-                    value={formData.area}
-                    onChange={(v) => updateField('area', v)}
-                    min={20}
-                    max={500}
-                    image="/images/home.png"
-                    unit="м²"
-                  />
+                      <CounterInput
+                        label="Площадь помещения"
+                        value={formData.area}
+                        onChange={(v) => updateField('area', v)}
+                        min={20}
+                        max={500}
+                        image={assetPath('home.png')}
+                        unit="м²"
+                      />
                 </div>
               </section>
 
@@ -437,7 +433,7 @@ function App() {
                       value={formData.sockets}
                       onChange={(v) => updateField('sockets', v)}
                       max={100}
-                      image="/images/socket.png"
+                      image={assetPath('socket.png')}
                       unit="шт"
                     />
                     <CounterInput
@@ -445,7 +441,7 @@ function App() {
                       value={formData.switches}
                       onChange={(v) => updateField('switches', v)}
                       max={50}
-                      image="/images/switch.png"
+                      image={assetPath('switch.png')}
                       unit="шт"
                     />
                   </div>
@@ -455,7 +451,7 @@ function App() {
                       value={formData.lightPoints}
                       onChange={(v) => updateField('lightPoints', v)}
                       max={50}
-                      image="/images/light.png"
+                      image={assetPath('light.png')}
                       unit="шт"
                     />
                     <CounterInput
@@ -463,7 +459,7 @@ function App() {
                       value={formData.lowVoltagePoints}
                       onChange={(v) => updateField('lowVoltagePoints', v)}
                       max={20}
-                      image="/images/wifi.png"
+                      image={assetPath('wifi.png')}
                       unit="точек"
                     />
                     <CounterInput
@@ -471,7 +467,7 @@ function App() {
                       value={formData.panelLines}
                       onChange={(v) => updateField('panelLines', v)}
                       max={200}
-                      image="/images/cable.png"
+                      image={assetPath('cable.png')}
                       unit="линий"
                       placeholder="Например: 12"
                     />
@@ -557,10 +553,7 @@ function App() {
                     Средняя длина линии: {AVERAGE_PANEL_LINE_LENGTH_METERS} м
                   </p>
                   <p className="text-sm text-neutral-400">
-                    Кабельные линии до щита: {result.panelLines.count} × {AVERAGE_PANEL_LINE_LENGTH_METERS} м = {result.panelLines.cableMeters} м
-                  </p>
-                  <p className="text-sm text-neutral-400">
-                    Монтаж линий: {result.panelLines.count} × {PANEL_LINE_PRICE} ₽ = {formatCurrency(result.panelLines.cost)} ₽
+                    Дополнительный кабель по линиям: {result.panelLines.count} × {AVERAGE_PANEL_LINE_LENGTH_METERS} м = {result.panelLines.cableMeters} м
                   </p>
                 </div>
 
@@ -568,14 +561,14 @@ function App() {
                 <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-100 mb-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center gap-3">
-                      <img src="/images/socket.png" alt="" className="w-8 h-8 object-contain opacity-50" />
+                      <img src={assetPath('socket.png')} alt="" className="w-8 h-8 object-contain opacity-50" />
                       <div>
                         <p className="text-xs text-neutral-400">Точек</p>
                         <p className="font-medium text-neutral-900">{result.socketBoxes.count + result.lowVoltage.count}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <img src="/images/cable.png" alt="" className="w-8 h-8 object-contain opacity-50" />
+                      <img src={assetPath('cable.png')} alt="" className="w-8 h-8 object-contain opacity-50" />
                       <div>
                         <p className="text-xs text-neutral-400">Кабель</p>
                         <p className="font-medium text-neutral-900">{Math.round(result.cable.length)} м</p>
@@ -644,7 +637,7 @@ function App() {
                         <span className="font-medium text-neutral-900">{formatCurrency(result.junctionBoxes.cost)} ₽</span>
                       </div>
                       <div className="flex justify-between items-center py-2 border-b border-neutral-200">
-                        <span className="text-sm text-neutral-600">Кабель ВВГнг</span>
+                        <span className="text-sm text-neutral-600">Монтаж кабеля</span>
                         <span className="font-medium text-neutral-900">{formatCurrency(result.cable.cost)} ₽</span>
                       </div>
                       <div className="flex justify-between items-center py-2 border-b border-neutral-200">
