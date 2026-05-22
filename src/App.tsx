@@ -150,7 +150,7 @@ const CounterInput = ({ label, value, onChange, min = 0, max = 1000, image, unit
   return (
     <div className="space-y-3">
       <Label className="flex items-center gap-3 text-sm font-medium text-neutral-700">
-        <img src={image} alt="" className="w-5 h-5 object-contain opacity-70" />
+        <img src={image} alt="" className="w-6 h-6 object-contain opacity-90 shrink-0" />
         {label}
       </Label>
       <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ function App() {
     switches: 17,
     lightPoints: 15,
     lowVoltagePoints: 5,
-    panelLines: 47,
+    panelLines: 10,
     wiringType: 'hidden',
   });
   
@@ -355,7 +355,7 @@ function App() {
       switches: 17,
       lightPoints: 15,
       lowVoltagePoints: 5,
-      panelLines: 47,
+      panelLines: 10,
       wiringType: 'hidden',
     });
     setShowDetails(false);
@@ -561,14 +561,14 @@ function App() {
                 <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-100 mb-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center gap-3">
-                      <img src={assetPath('socket.png')} alt="" className="w-8 h-8 object-contain opacity-50" />
+                      <img src={assetPath('socket.png')} alt="" className="w-8 h-8 object-contain opacity-80" />
                       <div>
                         <p className="text-xs text-neutral-400">Точек</p>
                         <p className="font-medium text-neutral-900">{result.socketBoxes.count + result.lowVoltage.count}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <img src={assetPath('cable.png')} alt="" className="w-8 h-8 object-contain opacity-50" />
+                      <img src={assetPath('cable.png')} alt="" className="w-8 h-8 object-contain opacity-80" />
                       <div>
                         <p className="text-xs text-neutral-400">Кабель</p>
                         <p className="font-medium text-neutral-900">{Math.round(result.cable.length)} м</p>
