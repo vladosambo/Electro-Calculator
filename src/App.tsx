@@ -78,16 +78,17 @@ const calculateEstimate = (data: FormData): CalculationResult => {
   const { area, sockets, switches, lightPoints, lowVoltagePoints, panelLines, wiringType } = data;
   
   // 1. Socket boxes (подрозетники)
-  const socketBoxCount = sockets + switches;
+  const socketBoxCount = sockets + switches + lowVoltagePoints;
   const socketBoxCost = socketBoxCount * PRICES.socketBoxDrilling;
-  const socketBoxFormula = `${sockets} + ${switches} = ${socketBoxCount} шт × ${PRICES.socketBoxDrilling} ₽`;
+  const socketBoxFormula = `${sockets} + ${switches} + ${lowVoltagePoints} = ${socketBoxCount} шт × ${PRICES.socketBoxDrilling} ₽`;
   
   // 2. Grooves (штробы)
   const cableLines = sockets * COEFFS.cableForSockets + switches * COEFFS.cableForSwitches;
-  const grooveLength = cableLines * COEFFS.groovePerLine;
+  const lowVoltageChaseMeters = lowVoltagePoints * 2;
+  const grooveLength = cableLines * COEFFS.groovePerLine + lowVoltageChaseMeters;
   const grooveMultiplier = wiringType === 'open' ? 0.4 : 1;
   const grooveCost = grooveLength * grooveMultiplier * PRICES.groove;
-  const grooveFormula = `(${sockets}×${COEFFS.cableForSockets} + ${switches}×${COEFFS.cableForSwitches}) × ${COEFFS.groovePerLine} = ${grooveLength.toFixed(1)} м${wiringType === 'open' ? ' × 0.4' : ''} × ${PRICES.groove} ₽`;
+  const grooveFormula = `(${sockets}×${COEFFS.cableForSockets} + ${switches}×${COEFFS.cableForSwitches}) × ${COEFFS.groovePerLine} + ${lowVoltagePoints}×2 = ${grooveLength.toFixed(1)} м${wiringType === 'open' ? ' × 0.4' : ''} × ${PRICES.groove} ₽`;
   
   // 3. Junction boxes (распаячные коробки)
   const junctionBoxCount = switches + Math.ceil(sockets / 5);
@@ -555,7 +556,7 @@ function App() {
                       <img src={assetPath('socket-v2.png')} alt="" className="w-8 h-8 object-contain opacity-100 contrast-125 saturate-125" />
                       <div>
                         <p className="text-xs text-neutral-400">Точек</p>
-                        <p className="font-medium text-neutral-900">{result.socketBoxes.count + result.lowVoltage.count}</p>
+                        <p className="font-medium text-neutral-900">{result.socketBoxes.count}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
