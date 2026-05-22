@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { 
   ChevronDown, 
   ChevronUp,
@@ -20,7 +20,6 @@ interface CalculationResult {
   cable: { count: number; cost: number; formula: string; length: number };
   panelModules: { count: number; cost: number; formula: string };
   panelInstallation: { cost: number; slots: number };
-  panelLines: { count: number; cableMeters: number };
   lowVoltage: { count: number; cost: number; formula: string };
   total: number;
 }
@@ -38,9 +37,9 @@ interface FormData {
 // Constants
 const PRICES = {
   socketBoxDrilling: 300,
-  groove: 250,
+  groove: 300,
   junctionBox: 550,
-  cable: 165,
+  cable: 150,
   panelModule: 350,
   wifiPoint: 900,
 };
@@ -51,12 +50,13 @@ const COEFFS = {
   groovePerLine: 1.7,
   cablePerArea: 2.8,
   cablePerLightPoint: 2.0,
-  modulesPerPoint: 3.5,
-  minModules: 12,
   moduleToSlotRatio: 1.5,
 };
 
-const AVERAGE_PANEL_LINE_LENGTH_METERS = 8;
+const CABLE_INSTALL_PRICE_PER_METER = 150;
+const CHASE_PRICE_PER_METER = 300;
+const SWITCHES_PER_JUNCTION_BOX = 2;
+const PANEL_LINES_PER_BOX_REDUCTION = 3;
 
 const assetPath = (file: string) => `${import.meta.env.BASE_URL}images/${file}`;
 
@@ -76,49 +76,49 @@ const calculatePanelInstallation = (slots: number): number => {
 // Main calculation function
 const calculateEstimate = (data: FormData): CalculationResult => {
   const { area, sockets, switches, lightPoints, lowVoltagePoints, panelLines, wiringType } = data;
-  
+
   // 1. Socket boxes (подрозетники)
   const socketBoxCount = sockets + switches + lowVoltagePoints;
   const socketBoxCost = socketBoxCount * PRICES.socketBoxDrilling;
   const socketBoxFormula = `${sockets} + ${switches} + ${lowVoltagePoints} = ${socketBoxCount} шт × ${PRICES.socketBoxDrilling} ₽`;
-  
+
   // 2. Grooves (штробы)
   const cableLines = sockets * COEFFS.cableForSockets + switches * COEFFS.cableForSwitches;
   const lowVoltageChaseMeters = lowVoltagePoints * 2;
   const grooveLength = cableLines * COEFFS.groovePerLine + lowVoltageChaseMeters;
   const grooveMultiplier = wiringType === 'open' ? 0.4 : 1;
-  const grooveCost = grooveLength * grooveMultiplier * PRICES.groove;
-  const grooveFormula = `(${sockets}×${COEFFS.cableForSockets} + ${switches}×${COEFFS.cableForSwitches}) × ${COEFFS.groovePerLine} + ${lowVoltagePoints}×2 = ${grooveLength.toFixed(1)} м${wiringType === 'open' ? ' × 0.4' : ''} × ${PRICES.groove} ₽`;
-  
+  const grooveCost = grooveLength * grooveMultiplier * CHASE_PRICE_PER_METER;
+  const grooveFormula = `(${sockets}×${COEFFS.cableForSockets} + ${switches}×${COEFFS.cableForSwitches}) × ${COEFFS.groovePerLine} + ${lowVoltagePoints}×2 = ${grooveLength.toFixed(1)} м${wiringType === 'open' ? ' × 0.4' : ''} × ${CHASE_PRICE_PER_METER} ₽`;
+
   // 3. Junction boxes (распаячные коробки)
-  const junctionBoxCount = switches + Math.ceil(sockets / 5);
+  const baseJunctionBoxes = Math.ceil(sockets / 5);
+  const switchJunctionBoxes = Math.ceil(switches / SWITCHES_PER_JUNCTION_BOX);
+  const lineBoxReduction = Math.floor(panelLines / PANEL_LINES_PER_BOX_REDUCTION);
+  const junctionBoxCount = Math.max(0, baseJunctionBoxes + switchJunctionBoxes - lineBoxReduction);
   const junctionBoxCost = junctionBoxCount * PRICES.junctionBox;
-  const junctionBoxFormula = `${switches} + ⌈${sockets}/5⌉ = ${junctionBoxCount} шт × ${PRICES.junctionBox} ₽`;
-  
+  const junctionBoxFormula = `max(0, ⌈${sockets}/5⌉ + ⌈${switches}/${SWITCHES_PER_JUNCTION_BOX}⌉ - ⌊${panelLines}/${PANEL_LINES_PER_BOX_REDUCTION}⌋) = ${junctionBoxCount} шт × ${PRICES.junctionBox} ₽`;
+
   // 4. Cable (кабель)
   const cableLength = area * COEFFS.cablePerArea + lightPoints * COEFFS.cablePerLightPoint;
   const cableMultiplier = wiringType === 'open' ? 0.8 : 1;
-  const panelCableMeters = panelLines * AVERAGE_PANEL_LINE_LENGTH_METERS;
-  const totalCableLength = cableLength + panelCableMeters;
-  const cableCost = totalCableLength * cableMultiplier * PRICES.cable;
-  const cableFormula = `(${area}×${COEFFS.cablePerArea} + ${lightPoints}×${COEFFS.cablePerLightPoint} + ${panelLines}×${AVERAGE_PANEL_LINE_LENGTH_METERS}) = ${totalCableLength.toFixed(0)} м${wiringType === 'open' ? ' × 0.8' : ''} × ${PRICES.cable} ₽`;
-  
+  const cableCost = cableLength * cableMultiplier * CABLE_INSTALL_PRICE_PER_METER;
+  const cableFormula = `(${area}×${COEFFS.cablePerArea} + ${lightPoints}×${COEFFS.cablePerLightPoint}) = ${cableLength.toFixed(0)} м${wiringType === 'open' ? ' × 0.8' : ''} × ${CABLE_INSTALL_PRICE_PER_METER} ₽`;
+
   // 5. Panel modules (модули щита)
-  const moduleCount = Math.max(COEFFS.minModules, Math.ceil(panelLines / COEFFS.modulesPerPoint));
+  const moduleCount = 3 + panelLines;
   const moduleCost = moduleCount * PRICES.panelModule;
-  const moduleFormula = `max(${COEFFS.minModules}, ⌈${panelLines}/${COEFFS.modulesPerPoint}⌉) = ${moduleCount} мод × ${PRICES.panelModule} ₽`;
-  
+  const moduleFormula = `3 + ${panelLines} = ${moduleCount} мод × ${PRICES.panelModule} ₽`;
+
   // 6. Panel installation (монтаж щита)
   const slots = Math.ceil(moduleCount * COEFFS.moduleToSlotRatio);
   const panelInstallationCost = calculatePanelInstallation(slots);
-  
+
   // 7. Low voltage (слаботочка)
   const lowVoltageCost = lowVoltagePoints * PRICES.wifiPoint;
   const lowVoltageFormula = `${lowVoltagePoints} × ${PRICES.wifiPoint} ₽`;
-  
-  // Total
+
   const total = socketBoxCost + grooveCost + junctionBoxCost + cableCost + moduleCost + panelInstallationCost + lowVoltageCost;
-  
+
   return {
     socketBoxes: { count: socketBoxCount, cost: socketBoxCost, formula: socketBoxFormula },
     grooves: { count: Math.ceil(grooveLength), cost: grooveCost, formula: grooveFormula, length: grooveLength },
@@ -126,7 +126,6 @@ const calculateEstimate = (data: FormData): CalculationResult => {
     cable: { count: Math.ceil(cableLength), cost: cableCost, formula: cableFormula, length: cableLength },
     panelModules: { count: moduleCount, cost: moduleCost, formula: moduleFormula },
     panelInstallation: { cost: panelInstallationCost, slots },
-    panelLines: { count: panelLines, cableMeters: panelCableMeters },
     lowVoltage: { count: lowVoltagePoints, cost: lowVoltageCost, formula: lowVoltageFormula },
     total,
   };
@@ -538,15 +537,6 @@ function App() {
                     {formatCurrency(result.total)}
                     <span className="text-xl text-neutral-400 ml-1">₽</span>
                   </p>
-                  <p className="mt-3 text-sm text-neutral-400">
-                    Линии на щит: {result.panelLines.count} шт.
-                  </p>
-                  <p className="text-sm text-neutral-400">
-                    Средняя длина линии: {AVERAGE_PANEL_LINE_LENGTH_METERS} м
-                  </p>
-                  <p className="text-sm text-neutral-400">
-                    Дополнительный кабель по линиям: {result.panelLines.count} × {AVERAGE_PANEL_LINE_LENGTH_METERS} м = {result.panelLines.cableMeters} м
-                  </p>
                 </div>
 
                 {/* Metrics */}
@@ -690,3 +680,4 @@ function App() {
 }
 
 export default App;
+
